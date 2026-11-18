@@ -71,6 +71,7 @@ export function PlayerPage() {
     return { ...dir, attributes: extra.attributes }
   } })
   const history = useQuery({ queryKey: ['player-clubs', id], queryFn: async () => must(await supabase.from('squad_memberships').select('id,club_id,joined_at,left_at').eq('player_id', Number(id)).order('joined_at', { ascending: false })) as { id: number; club_id: number; joined_at: string; left_at: string | null }[] })
+  const listing = useQuery({ queryKey: ['listing', id], queryFn: async () => must(await supabase.from('transfer_market').select('asking_price').eq('player_id', Number(id)).maybeSingle()) as { asking_price: number | null } | null })
   return <Q q={player}>{(p) => {
     if (!p) return <Empty title="Este jugador no está disponible." action={<Link className="btn" to="/jugadores">Ver jugadores</Link>} />
     const main = positions.data?.find((x) => x.id === p.main_position)
@@ -78,7 +79,7 @@ export function PlayerPage() {
     return <>
       <header className="player-head">
         {p.photo_path ? <img className="avatar" src={p.photo_path} alt="" width="104" height="104" /> : <Avatar name={p.name} size={104} />}
-        <div><h1>{p.name}</h1><p>{main?.name}{p.club_slug && <>, <Link to={`/clubes/${p.club_slug}`}>{p.club_name}</Link></>}</p></div>
+        <div><h1>{p.name}</h1><p>{main?.name}{p.club_slug && <>, <Link to={`/clubes/${p.club_slug}`}>{p.club_name}</Link></>}</p>{listing.data && <Link className="text-link" to="/mercado">Transferible{listing.data.asking_price != null ? `, pide ${fmtMoney(listing.data.asking_price)}` : ''}</Link>}</div>
         <span className="player-head__ovr">{p.overall}<small>media</small></span>
       </header>
       <div className="two-col">

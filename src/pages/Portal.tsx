@@ -6,21 +6,9 @@ import { byId, useClubs, usePriceScale, useRules, useSeasons } from '../lib/data
 import { BASE, fmtDate, fmtMoney, fmtNumber } from '../lib/format'
 import { googleEnabled, useAuth } from '../lib/auth'
 import { must, supabase } from '../lib/supabase'
-import { ClubLink, Crest, Empty, Facts, Loading, PageHead, Q, Section } from '../components/ui'
+import { Crest, Empty, Facts, PageHead, Q, Section } from '../components/ui'
 
-const KIND: Record<string, string> = { purchase: 'Compra', free_signing: 'Jugador libre', club_release: 'Venta al club', loan_start: 'Préstamo', loan_return: 'Fin de préstamo', loan_purchase: 'Compra tras préstamo', swap: 'Intercambio', release_clause: 'Cláusula de rescisión', admin: 'Ajuste' }
 const useCurrent = () => { const s = useSeasons(); return s.data?.find((x) => x.is_current) }
-
-export function Market() {
-  const clubs = byId(useClubs().data); const season = useCurrent(); const rules = useRules(season?.id)
-  const win = useQuery({ queryKey: ['market-window'], queryFn: async () => must(await supabase.from('market_windows').select('*').eq('is_open', true).maybeSingle()) as { closes_at: string | null } | null })
-  const list = useQuery({ queryKey: ['transfers'], queryFn: async () => must(await supabase.from('transfers').select('id,kind,amount,from_club,to_club,occurred_at,player:players(id,name)').order('occurred_at', { ascending: false }).limit(50)) as unknown as { id: number; kind: string; amount: number; from_club: number | null; to_club: number | null; occurred_at: string; player: { id: number; name: string } }[] })
-  return <>
-    <PageHead title="Mercado de pases" lead={win.data ? (win.data.closes_at ? `Abierto hasta el ${fmtDate(win.data.closes_at)}.` : 'Abierto.') : 'El mercado de la web nueva todavía no está abierto.'} />
-    {rules.data && <div className="format"><div><b>+{fmtNumber(rules.data.clause_premium_pct)} %</b><span>cláusula sobre el valor del jugador</span></div><div><b>−{fmtNumber(rules.data.release_discount_pct)} %</b><span>al vender un jugador al club</span></div><div><b>{rules.data.squad_size}</b><span>jugadores por plantilla</span></div></div>}
-    <Section title="Transferencias"><Q q={list}>{(rows) => rows.length ? <div className="table-wrap"><table className="table"><thead><tr><th scope="col">Jugador</th><th scope="col">Operación</th><th scope="col" className="hide-sm">Desde</th><th scope="col" className="hide-sm">Hacia</th><th className="num" scope="col">Importe</th></tr></thead><tbody>{rows.map((t) => <tr key={t.id}><td><Link to={`/jugadores/${t.player.id}`}>{t.player.name}</Link></td><td>{KIND[t.kind]}</td><td className="hide-sm">{t.from_club ? <ClubLink club={clubs.get(t.from_club)} size={20} /> : 'Libre'}</td><td className="hide-sm">{t.to_club ? <ClubLink club={clubs.get(t.to_club)} size={20} /> : 'Libre'}</td><td className="num">{fmtMoney(t.amount)}</td></tr>)}</tbody></table></div> : <Empty title="Todavía no hay transferencias registradas." />}</Q></Section>
-  </>
-}
 
 export function News() {
   const clubs = byId(useClubs().data)
@@ -41,7 +29,7 @@ export function Rules() {
         <Section title="Competición"><p>NG League tiene una sola división. Los clubes juegan todos contra todos a una rueda. La victoria vale {r.points_win} puntos, el empate {r.points_draw} y la derrota {r.points_loss}.</p><p>Los desempates se aplican en este orden: {r.tiebreakers.map((t) => tb[t].toLowerCase()).join(', ')}.</p></Section>
         <Section title="Playoffs por el título"><p>Clasifican los seis primeros. En cuartos juegan 3.º contra 6.º y 4.º contra 5.º. En semifinales, 1.º contra el ganador de 4.º-5.º y 2.º contra el ganador de 3.º-6.º. Todos los cruces son a partido único y, si hay empate, se definen por penales.</p></Section>
         <Section title="Descenso simbólico"><p>Juegan los últimos cuatro puestos. Con 11 clubes, 11.º contra 8.º y 9.º contra 10.º. Los perdedores reciben un descenso simbólico, sin consecuencias para la edición siguiente. No existe una segunda división.</p></Section>
-        <Section title="Plantillas y mercado"><p>Cada plantilla tiene hasta {r.squad_size} jugadores: {r.starters} titulares y {r.bench} suplentes. Debe incluir {r.required_stars === 1 ? 'un jugador' : `${r.required_stars} jugadores`} de media {r.star_rating}, y nadie puede superar esa media.</p><p>La cláusula de rescisión equivale al valor del jugador más {fmtNumber(r.clause_premium_pct)} %. Se paga con el mercado abierto y no necesita la aceptación del club dueño. Los jugadores sin valor no tienen cláusula. Al vender un jugador al club se recibe su valor menos {fmtNumber(r.release_discount_pct)} %.</p></Section>
+        <Section title="Plantillas y mercado"><p>Cada plantilla tiene hasta {r.squad_size} jugadores: {r.starters} titulares y {r.bench} suplentes. Debe incluir {r.required_stars === 1 ? 'un jugador' : `${r.required_stars} jugadores`} de media {r.star_rating}, y nadie puede superar esa media.</p><p>La cláusula de rescisión equivale al valor del jugador más {fmtNumber(r.clause_premium_pct)} %. Se paga con el mercado abierto y no necesita la aceptación del club dueño. Los jugadores sin valor no tienen cláusula. Al dejar libre a un jugador se recibe su valor menos {fmtNumber(r.release_discount_pct)} %.</p></Section>
       </div>
       <aside><Section title="Precio según media" className="section--tint"><Q q={prices}>{(p) => <Facts items={p.filter((x) => x.value > 0).map((x) => [String(x.overall), fmtMoney(x.value)])} />}</Q><p className="note">Media {r.star_rating} y media 67 o menor: sin costo. Más de {r.star_rating}: no elegible.</p></Section></aside>
     </div> : <Empty title="Las reglas de esta temporada todavía no están cargadas." />}</Q>

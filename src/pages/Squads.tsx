@@ -93,6 +93,27 @@ function PendingSquad({ clubId, canAct, onChange }: { clubId: number; canAct: bo
   return <Section title="Por completar" className="section--tint">{out.length > 0 && <><h3 className="mini-head">Ya vendidos, deben salir</h3><ul className="plain-list">{out.map(row)}</ul></>}{inc.length > 0 && <><h3 className="mini-head">Ya pagados, reservados para el club</h3><ul className="plain-list">{inc.map(row)}</ul></>}<p className="note">Estas operaciones no mueven dinero: ya se registraron en la web anterior.</p></Section>
 }
 
+function SquadMarket({ clubId, players, open, discount, isAdmin, onChange, onReleased }: { clubId: number; players: PlayerRow[]; open: boolean; discount: number; isAdmin: boolean; onChange: () => void; onReleased: (player: number) => void }) {
+  const qc = useQueryClient(); const [editing, setEditing] = useState<number | null>(null); const [price, setPrice] = useState('')
+  const listed = useQuery({ queryKey: ['club-listings', clubId], queryFn: async () => must(await supabase.from('transfer_listings').select('player_id,asking_price').eq('club_id', clubId)) as { player_id: number; asking_price: number | null }[] })
+  const sold = useQuery({ queryKey: ['adjustments', clubId, 'remove'], queryFn: async () => (must(await supabase.from('squad_adjustments').select('player_id').eq('club_id', clubId).eq('action', 'remove').eq('status', 'pending')) as { player_id: number }[]).map((x) => x.player_id) })
+  const refresh = () => { qc.invalidateQueries({ queryKey: ['club-listings'] }); qc.invalidateQueries({ queryKey: ['transfer-market'] }); qc.invalidateQueries({ queryKey: ['listing'] }); onChange() }
+  const fail = (e: Error) => toast(e.message, 'error')
+  const list = useMutation({ mutationFn: (p: number) => rpc('list_player', { p_club: clubId, p_player: p, p_asking: price === '' ? null : Number(price) }), onSuccess: () => { setEditing(null); setPrice(''); toast('Jugador publicado como transferible.'); refresh() }, onError: fail })
+  const unlist = useMutation({ mutationFn: (p: number) => rpc('unlist_player', { p_club: clubId, p_player: p }), onSuccess: () => { toast('Jugador quitado de transferibles.'); refresh() }, onError: fail })
+  const release = useMutation({ mutationFn: (p: number) => rpc<number>('release_player', { p_club: clubId, p_player: p }), onSuccess: (n, p) => { onReleased(p); toast(`Jugador liberado. Recibiste ${fmtMoney(n)}.`); refresh() }, onError: fail })
+  const amount = (p: PlayerRow) => Math.round((p.market_value ?? 0) * (1 - discount / 100) * 10) / 10
+  const rows = players.filter((p) => !sold.data?.includes(p.id)); const busy = list.isPending || unlist.isPending || release.isPending
+  return <Section title="Transferibles y salidas">
+    {!open && <p className="note">El mercado está cerrado. {isAdmin ? <Link to="/administracion?seccion=mercado">Abrilo desde el panel</Link> : 'Cuando el administrador lo abra vas a poder publicar y liberar jugadores.'}</p>}
+    <ul className="market-rows">{rows.map((p) => { const l = listed.data?.find((x) => x.player_id === p.id); return <li key={p.id}>
+      <Rating value={p.overall} /><span className="market-rows__name"><Link to={`/jugadores/${p.id}`}>{p.name}</Link><small>{fmtMoney(p.market_value)}{l ? `, transferible${l.asking_price != null ? ` por ${fmtMoney(l.asking_price)}` : ''}` : ''}</small></span>
+      <div className="tools">{l ? <button className="btn btn--small" disabled={busy} onClick={() => unlist.mutate(p.id)}>Quitar de transferibles</button> : <button className="btn btn--small" disabled={!open || busy} onClick={() => { setEditing(editing === p.id ? null : p.id); setPrice('') }}>Poner transferible</button>}<button className="btn btn--small btn--danger" disabled={!open || busy} onClick={() => { if (confirm(`¿Dejar libre a ${p.name}? Vas a recibir ${fmtMoney(amount(p))}.`)) release.mutate(p.id) }}>Dejar libre</button></div>
+      {editing === p.id && <form className="offer-form" onSubmit={(e) => { e.preventDefault(); list.mutate(p.id) }}><Field label="Precio pedido (M), opcional"><input type="number" min="0" step="0.1" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="A convenir" /></Field><button className="btn btn--primary" disabled={busy}>Publicar</button></form>}
+    </li> })}</ul>
+  </Section>
+}
+
 function SignPlayer({ clubId, onChange }: { clubId: number; onChange: () => void }) {
   const [q, setQ] = useState(''); const [term, setTerm] = useState('')
   useEffect(() => { const t = setTimeout(() => setTerm(normalize(q)), 250); return () => clearTimeout(t) }, [q])
@@ -125,7 +146,6 @@ export function Squads() {
   const payload = () => slots.map((s) => ({ ...s, x: s.slot < 11 ? s.x : null, y: s.slot < 11 ? s.y : null, position_id: s.slot < 11 ? s.position_id : null }))
   const save = useMutation({ mutationFn: () => rpc('save_lineup', { p_club: id, p_formation: formation, p_slots: payload() }), onSuccess: () => { setDirty(false); toast('Plantilla guardada.'); refreshAll() }, onError: (e: Error) => toast(e.message, 'error') })
   const setStatus = useMutation({ mutationFn: async (status: 'draft' | 'submitted') => { if (status === 'submitted' && dirty) await rpc('save_lineup', { p_club: id, p_formation: formation, p_slots: payload() }); await rpc('set_lineup_status', { p_club: id, p_status: status }); return status }, onSuccess: (s) => { setDirty(false); toast(s === 'submitted' ? 'Plantilla entregada.' : 'Entrega deshecha.'); refreshAll() }, onError: (e: Error) => toast(e.message, 'error') })
-  const release = useMutation({ mutationFn: (p: number) => rpc<number>('release_player', { p_club: id, p_player: p }), onSuccess: (n, p) => { setSlots((cur) => cur.map((x) => (x.player_id === p ? { ...x, player_id: null } : x))); setPick(null); toast(`Jugador vendido al club por ${fmtMoney(n)}.`); refreshAll() }, onError: (e: Error) => toast(e.message, 'error') })
   const players = useMemo(() => new Map((squad.data ?? []).map((p) => [p.id, p])), [squad.data])
   if (clubsQ.isPending) return <Loading />
   if (!club) return <Empty title="Todavía no hay clubes activos." />
@@ -163,7 +183,6 @@ export function Squads() {
   const plainText = () => [`Formación ${formation} · Plantel ${fmtMoney(s?.squad_value)}`, ...slots.slice(0, 11).map((x) => { const p = at(x); return `${code(x.position_id)}: ${p ? `${p.name} (${p.overall}, ${price(p)})` : '—'}` }), 'Suplentes:', ...slots.slice(11).map((x) => { const p = at(x); return `- ${p ? `${p.name} (${p.position_code}, ${p.overall}, ${price(p)})` : '—'}` })].join('\n')
   const groupText = () => [`*${club.name}* · ${formation}`, `Plantel ${fmtMoney(s?.squad_value)} · Media ${fmtDec(s?.avg_overall)}`, '', '*Titulares*', ...slots.slice(0, 11).map((x) => { const p = at(x); return `${code(x.position_id)}  ${p ? `${p.name} (${p.overall})` : '—'}` }), '', '*Suplentes*', ...slots.slice(11).map((x) => { const p = at(x); return `- ${p ? `${p.name} (${p.overall})` : '—'}` })].join('\n')
   const copy = (group: boolean) => navigator.clipboard.writeText(group ? groupText() : plainText()).then(() => toast(group ? 'Listo para pegar en el grupo.' : 'Plantilla copiada.'), () => toast('No se pudo copiar.', 'error'))
-  const saleAmount = (p: PlayerRow) => Math.round((p.market_value ?? 0) * (1 - (rules.data?.release_discount_pct ?? 0) / 100) * 10) / 10
   const picked = pick && 'slot' in pick ? slots[pick.slot] : null; const pickedPlayer = pick ? ('slot' in pick ? (picked?.player_id ? players.get(picked.player_id) : undefined) : players.get(pick.player)) : undefined
   return <>
     <PageHead title="Armado de plantillas" lead={canEdit ? 'Arrastrá jugadores o tocá dos puestos para intercambiarlos.' : 'Formación, titulares, suplentes y valor de cada plantel.'}><Field label="Club"><select value={club.slug} onChange={(e) => { if (!dirty || confirm('Tenés cambios sin guardar. ¿Cambiar de club y descartarlos?')) setParams({ club: e.target.value }) }}>{list.map((c) => <option key={c.id} value={c.slug}>{c.name}</option>)}</select></Field></PageHead>
@@ -184,11 +203,12 @@ export function Squads() {
         </div>}
         {editable && pickedPlayer && <div className="panel"><strong>{pickedPlayer.name}</strong><p>Tocá otro puesto para moverlo.</p>
           {picked && picked.slot < 11 && <Field label="Posición en este puesto"><select value={picked.position_id ?? ''} onChange={(e) => change((d) => { d[picked.slot].position_id = Number(e.target.value) })}>{positions.data?.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>}
-          <div className="tools" style={{ marginTop: 10 }}><Link className="btn btn--small" to={`/jugadores/${pickedPlayer.id}`}>Ver ficha</Link>{market.data && <button className="btn btn--small btn--danger" disabled={release.isPending} onClick={() => { if (confirm(`¿Vender a ${pickedPlayer.name} al club? Vas a recibir ${fmtMoney(saleAmount(pickedPlayer))}.`)) release.mutate(pickedPlayer.id) }}>Vender al club</button>}</div>
+          <div className="tools" style={{ marginTop: 10 }}><Link className="btn btn--small" to={`/jugadores/${pickedPlayer.id}`}>Ver ficha</Link></div>
         </div>}
         <Section title="Suplentes"><div className="bench">{slots.slice(11).map((x, i) => <BenchRow key={x.slot} id={`s${x.slot}`} dropId={`t${x.slot}`} p={x.player_id ? players.get(x.player_id) : undefined} label={`Suplente ${i + 1}`} editable={editable} picked={!!pick && 'slot' in pick && pick.slot === x.slot} onTap={() => tap({ slot: x.slot })} />)}</div></Section>
         {canEdit && (editable || unplaced.length > 0) && <Section title="Sin ubicar"><UnplacedZone>{!unplaced.length && <span className="editor-note">Soltá acá a un jugador para sacarlo de la alineación.</span>}{unplaced.map((p) => <BenchRow key={p.id} id={`u${p.id}`} p={p} label="" editable={editable} picked={!!pick && 'player' in pick && pick.player === p.id} onTap={() => tap({ player: p.id })} />)}</UnplacedZone></Section>}
         <PendingSquad clubId={club.id} canAct={canEdit} onChange={refreshAll} />
+        {canEdit && <SquadMarket clubId={club.id} players={squad.data ?? []} open={!!market.data} discount={rules.data?.release_discount_pct ?? 0} isAdmin={isAdmin} onChange={refreshAll} onReleased={(p) => { setSlots((cur) => cur.map((x) => (x.player_id === p ? { ...x, player_id: null } : x))); setPick(null) }} />}
         {canEdit && market.data && <SignPlayer clubId={club.id} onChange={refreshAll} />}
       </div>
     </div></DndContext>}</Q>

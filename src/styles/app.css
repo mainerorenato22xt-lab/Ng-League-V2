@@ -411,3 +411,20 @@ a.tie:hover { background: var(--s2); }
 .score-inputs strong { align-self: center; }
 @media (min-width: 1181px) { .squad__field { position: sticky; top: 14px; } }
 .format b.is-word { font-size: clamp(19px, 5.4vw, 26px); line-height: 1.15; }
+.player-cell { display: inline-flex; align-items: center; gap: 9px; min-width: 0; }
+.offer-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.offer-form .field { width: min(210px, 100%); }
+.deal-list, .market-rows { display: grid; gap: 4px; }
+.deal-list li { display: grid; gap: 8px; padding: 12px 14px; background: var(--s1); border-radius: 10px; }
+.deal-list li > span:nth-child(2) { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--text-2); }
+.deal-list b { color: var(--text); }
+.deal-list .btn { width: fit-content; }
+.market-rows li { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6px 10px; padding: 9px 10px; background: var(--s1); border-radius: 10px; }
+.market-rows__name { display: grid; min-width: 0; }
+.market-rows__name small { color: var(--text-3); }
+.market-rows .tools, .market-rows .offer-form { grid-column: 1 / -1; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.offer-form .note { flex-basis: 100%; margin: 0; }
+.offers { margin-top: 28px; align-items: start; }
+.offers > .section { margin-top: 0; }
+@media (min-width: 1181px) { .market-rows li { grid-template-columns: auto minmax(0, 1fr) auto; } .market-rows .tools { grid-column: auto; } }
