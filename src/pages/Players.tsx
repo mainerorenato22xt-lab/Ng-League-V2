@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'
 import { byId, useClubs, useSummaries, type PlayerRow } from '../lib/data'
 import { ATTRIBUTE_GROUPS, BASE, fmtDec, fmtMoney, normalize } from '../lib/format'
 import { must, supabase } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
 import { Avatar, ClubLink, Crest, Empty, Facts, Field, Loading, PageHead, Q, Rating, Section } from '../components/ui'
 
 const PAGE = 40
@@ -23,7 +24,7 @@ export function PlayersPage() {
     queryKey: ['players', key, page], placeholderData: keepPreviousData,
     queryFn: async () => {
       const [col, dir] = f.sort.split('.')
-      let q = supabase.from('player_directory').select('id,name,country_name,age,position_code,overall,market_value,club_id,club_name,club_slug,is_eligible,is_available', { count: 'estimated' })
+      let q = supabase.from('player_directory').select('id,name,country_name,age,position_code,overall,market_value,club_id,club_name,club_slug,is_eligible,is_available,reserved_club_name', { count: 'estimated' })
       if (term) q = q.ilike('search_name', `%${term}%`)
       if (f.country) q = q.eq('country_id', +f.country)
       if (f.position) q = q.or(`main_position.eq.${+f.position},secondary_positions.cs.{${+f.position}}`)
@@ -56,7 +57,7 @@ export function PlayersPage() {
     </form>
     <Q q={list} label="Buscando jugadores">{({ rows, count }) => rows.length ? <>
       <div className={`table-wrap ${list.isFetching ? 'is-stale' : ''}`}><table className="table"><thead><tr><th className="num" scope="col">Media</th><th scope="col">Jugador</th><th scope="col">Pos</th><th className="num hide-sm" scope="col">Edad</th><th scope="col" className="hide-sm">Nacionalidad</th><th scope="col" className="hide-sm">Club</th><th className="num" scope="col">Precio</th></tr></thead>
-        <tbody>{rows.map((p) => <tr key={p.id}><td className="num"><Rating value={p.overall} /></td><td><Link to={`/jugadores/${p.id}`}>{p.name}</Link></td><td>{p.position_code}</td><td className="num hide-sm">{p.age ?? 'Sin dato'}</td><td className="hide-sm">{p.country_name ?? <span className="muted">Sin confirmar</span>}</td><td className="hide-sm">{p.club_slug ? <Link to={`/clubes/${p.club_slug}`}>{p.club_name}</Link> : <span className="muted">{p.is_eligible ? 'Libre' : 'No elegible'}</span>}</td><td className="num">{fmtMoney(p.market_value)}</td></tr>)}</tbody></table></div>
+        <tbody>{rows.map((p) => <tr key={p.id}><td className="num"><Rating value={p.overall} /></td><td><Link to={`/jugadores/${p.id}`}>{p.name}</Link></td><td>{p.position_code}</td><td className="num hide-sm">{p.age ?? 'Sin dato'}</td><td className="hide-sm">{p.country_name ?? <span className="muted">Sin confirmar</span>}</td><td className="hide-sm">{p.club_slug ? <Link to={`/clubes/${p.club_slug}`}>{p.club_name}</Link> : <span className="muted">{p.reserved_club_name ? `Reservado para ${p.reserved_club_name}` : p.is_eligible ? 'Libre' : 'No elegible'}</span>}</td><td className="num">{fmtMoney(p.market_value)}</td></tr>)}</tbody></table></div>
       <div className="pager"><span>Página {page + 1}{count ? ` de ${Math.max(1, Math.ceil(count / PAGE)).toLocaleString('es-AR')}` : ''}</span><button className="btn" disabled={page === 0} onClick={() => { setPage(page - 1); scrollTo(0, 0) }}><ChevronLeft size={16} aria-hidden="true" />Anterior</button><button className="btn" disabled={rows.length < PAGE} onClick={() => { setPage(page + 1); scrollTo(0, 0) }}>Siguiente<ChevronRight size={16} aria-hidden="true" /></button></div>
     </> : <Empty title="Ningún jugador coincide con estos filtros." action={<button className="btn" onClick={() => setF(EMPTY)}>Limpiar filtros</button>} />}</Q>
   </>
@@ -85,12 +86,33 @@ export function PlayerPage() {
         <div>{ATTRIBUTE_GROUPS.filter((g) => g.title !== 'Portero' || p.main_position === 0).map((g) => <Section key={g.title} title={g.title}><div className="bars">{g.items.map(([n, i]) => { const v = p.attributes?.[i] ?? 0; return <div key={n}><span>{n}</span><i><em style={{ width: `${v}%` }} /></i><b>{v}</b></div> })}</div></Section>)}</div>
         <aside>
           <Section title="Ficha" className="section--tint"><Facts items={[['Edad', p.age ?? 'Sin dato'], ['Nacionalidad', p.country_name ?? 'Sin confirmar'], ['Altura', p.height_cm ? `${p.height_cm} cm` : 'Sin dato'], ['Peso', p.weight_kg ? `${p.weight_kg} kg` : 'Sin dato'], ['Pie hábil', p.foot === 'left' ? 'Izquierdo' : p.foot === 'right' ? 'Derecho' : 'Sin dato'], ['Posiciones secundarias', second.length ? second.join(', ') : 'Ninguna']]} /></Section>
-          <Section title="Mercado"><Facts items={[['Precio', fmtMoney(p.market_value)], ['Cláusula de rescisión', p.release_clause ? fmtMoney(p.release_clause) : 'No tiene'], ['Estado', p.club_id ? 'Con club' : p.is_eligible ? 'Libre' : 'No elegible']]} /></Section>
+          <Section title="Mercado"><Facts items={[['Precio', fmtMoney(p.market_value)], ['Cláusula de rescisión', p.release_clause ? fmtMoney(p.release_clause) : 'No tiene'], ['Estado', p.club_id ? 'Con club' : p.reserved_club_name ? `Reservado para ${p.reserved_club_name}` : p.is_eligible ? 'Libre' : 'No elegible']]} /></Section>
           <Section title="Historial de clubes"><Q q={history}>{(h) => h.length ? <ul className="plain-list">{h.map((x) => <li key={x.id}><ClubLink club={clubs.get(x.club_id)} size={20} /><span className="push muted">{x.left_at ? 'Anterior' : 'Actual'}</span></li>)}</ul> : <Empty title="Sin clubes registrados." />}</Q></Section>
         </aside>
       </div>
     </>
   }}</Q>
+}
+
+type Adjustment = { id: number; action: 'incorporate' | 'remove'; player: { id: number; name: string; overall: number } }
+function PendingSquad({ clubId }: { clubId: number }) {
+  const { session, profile } = useAuth(); const qc = useQueryClient(); const uid = session?.user.id
+  const items = useQuery({ queryKey: ['adjustments', clubId], queryFn: async () => must(await supabase.from('squad_adjustments').select('id,action,player:players(id,name,overall)').eq('club_id', clubId).eq('status', 'pending').order('action', { ascending: false })) as unknown as Adjustment[] })
+  const mine = useQuery({ queryKey: ['my-club', uid], enabled: !!uid, queryFn: async () => (must(await supabase.from('coaches').select('coach_tenures(club_id,is_current)').eq('profile_id', uid!).maybeSingle()) as { coach_tenures: { club_id: number; is_current: boolean }[] } | null)?.coach_tenures.find((t) => t.is_current)?.club_id ?? null })
+  const apply = useMutation({
+    mutationFn: async (id: number) => { const { error } = await supabase.rpc('apply_squad_adjustment', { p_id: id }); if (error) throw new Error(error.message) },
+    onSuccess: () => { for (const key of ['adjustments', 'lineup', 'summaries', 'club-squad']) qc.invalidateQueries({ queryKey: [key] }) },
+  })
+  if (!items.data?.length) return null
+  const canAct = profile?.role === 'admin' || mine.data === clubId
+  const group = (action: Adjustment['action']) => items.data!.filter((i) => i.action === action)
+  const row = (i: Adjustment) => <li key={i.id}><Rating value={i.player.overall} /><Link to={`/jugadores/${i.player.id}`}>{i.player.name}</Link>{canAct && <button className="btn btn--small push" disabled={apply.isPending} onClick={() => { if (i.action === 'incorporate' || confirm(`¿Quitar a ${i.player.name} de la plantilla? No se acredita dinero.`)) apply.mutate(i.id) }}>{i.action === 'incorporate' ? 'Incorporar' : 'Quitar'}</button>}</li>
+  return <Section title="Por completar" className="section--tint">
+    {group('remove').length > 0 && <><h3 className="mini-head">Ya vendidos, deben salir</h3><ul className="plain-list">{group('remove').map(row)}</ul></>}
+    {group('incorporate').length > 0 && <><h3 className="mini-head">Ya pagados, reservados para el club</h3><ul className="plain-list">{group('incorporate').map(row)}</ul></>}
+    <p className="note">Estas operaciones no mueven dinero: ya se registraron en la web anterior.</p>
+    {apply.isError && <p className="form-msg" role="alert">{apply.error.message}</p>}
+  </Section>
 }
 
 type Slot = { slot: number; x: number | null; y: number | null; position_id: number | null; player: { id: number; name: string; overall: number; age: number | null } | null }
@@ -115,6 +137,7 @@ export function Squads() {
         </div>
         <div>
           <div className="squad__meta"><Crest club={club} size={40} /><div><b>{club?.name}</b><span>{l.formation}, {l.status === 'submitted' ? 'plantilla entregada' : 'en armado'}</span></div></div>
+          {club && <PendingSquad clubId={club.id} />}
           <Section title="Suplentes"><ul className="plain-list">{bench.map((x) => <li key={x.slot}>{x.player ? <><Rating value={x.player.overall} /><Link to={`/jugadores/${x.player.id}`}>{x.player.name}</Link></> : <span className="muted">Puesto libre</span>}</li>)}</ul></Section>
         </div>
       </div>

@@ -41,19 +41,22 @@ export function Home() {
 
   return (
     <div className="home">
-      <section className="hero">
-        <div className="hero__copy">
-          <h1>Temporada {current?.number}</h1>
-          <p className="hero__status">{STATUS[current?.status ?? 'draft']}</p>
-          {champion && <Link to={`/clubes/${champion.slug}`} className="hero__champion"><Crest club={champion} size={60} /><span><small>Campeón vigente</small><b>{champion.name}</b></span></Link>}
-          <div className="hero__actions"><Link className="btn btn--primary" to="/fixture">Ver fixture</Link><Link className="btn" to="/campeones">Ver campeones</Link></div>
-        </div>
-        <img className="hero__photo" src={`${BASE}brand/portada.jpg`} alt="Plantel campeón de NG League con el trofeo" width="1600" height="900" />
-        {final && <Link className="hero__final" to={`/partidos/${final.id}`}>
+      <div className="bento">
+        <section className="hero">
+          <img className="hero__photo" src={`${BASE}brand/portada.jpg`} alt="Plantel campeón de NG League con el trofeo" width="1600" height="900" />
+          <div className="hero__copy">
+            <span className="chip">{STATUS[current?.status ?? 'draft']}</span>
+            <h1>Temporada {current?.number}</h1>
+            <div className="hero__actions"><Link className="btn btn--primary" to="/fixture">Ver fixture</Link><Link className="btn btn--glass" to="/tabla">Ver tabla</Link></div>
+          </div>
+        </section>
+        {champion && <Link to={`/clubes/${champion.slug}`} className="tile tile--champion"><Crest club={champion} size={76} /><span><small>Campeón vigente</small><b>{champion.name}</b></span></Link>}
+        {final && <Link className="tile tile--final" to={`/partidos/${final.id}`}>
           <small>Última final, temporada {last?.number}</small>
-          <span><Crest club={home} size={32} /><b>{final.home_goals}-{final.away_goals}</b><Crest club={away} size={32} /></span>
+          <span className="final-score"><Crest club={home} size={44} /><b>{final.home_goals}-{final.away_goals}</b><Crest club={away} size={44} /></span>
+          <em>{home?.name} y {away?.name}</em>
         </Link>}
-      </section>
+      </div>
 
       <div className="home__grid">
         <div className="home__main">

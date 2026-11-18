@@ -81,7 +81,7 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="app">
       <a className="skip" href="#contenido">Ir al contenido</a>
       <aside className="rail">
-        <Link to="/" className="brand" aria-label="NG League, inicio"><img src={`${BASE}brand/logo.webp`} alt="" width="34" height="49" /><span>NG League</span></Link>
+        <Link to="/" className="brand" aria-label="NG League, inicio"><img src={`${BASE}brand/logo.webp`} alt="" width="30" height="44" /><span>NG League</span></Link>
         <nav aria-label="Secciones"><NavItems /></nav>
       </aside>
       <div className="main">
