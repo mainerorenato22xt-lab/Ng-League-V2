@@ -4,8 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { must, supabase, SUPABASE_KEY, SUPABASE_URL } from './supabase'
 
 type Profile = { id: string; display_name: string | null; avatar_url: string | null; role: 'admin' | 'dt' | 'visitor'; email: string | null }
-type Auth = { session: Session | null; ready: boolean; profile: Profile | null; signOut: () => Promise<void> }
-const Ctx = createContext<Auth>({ session: null, ready: false, profile: null, signOut: async () => {} })
+type Auth = { session: Session | null; ready: boolean; profile: Profile | null; profileLoading: boolean; isAdmin: boolean; clubId: number | null; signOut: () => Promise<void> }
+const Ctx = createContext<Auth>({ session: null, ready: false, profile: null, profileLoading: false, isAdmin: false, clubId: null, signOut: async () => {} })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
@@ -20,7 +20,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ['profile', uid], enabled: !!uid,
     queryFn: async () => must(await supabase.from('profiles').select('id,display_name,avatar_url,role,email').eq('id', uid!).maybeSingle()) as Profile | null,
   })
-  return <Ctx.Provider value={{ session, ready, profile: profile.data ?? null, signOut: async () => { await supabase.auth.signOut() } }}>{children}</Ctx.Provider>
+  const coach = useQuery({
+    queryKey: ['my-club', uid], enabled: !!uid,
+    queryFn: async () => (must(await supabase.from('coaches').select('coach_tenures(club_id,is_current)').eq('profile_id', uid!).maybeSingle()) as { coach_tenures: { club_id: number; is_current: boolean }[] } | null)?.coach_tenures.find((t) => t.is_current)?.club_id ?? null,
+  })
+  return <Ctx.Provider value={{ session, ready, profile: profile.data ?? null, profileLoading: !!uid && profile.isPending, isAdmin: profile.data?.role === 'admin', clubId: coach.data ?? null, signOut: async () => { await supabase.auth.signOut() } }}>{children}</Ctx.Provider>
 }
 export const useAuth = () => useContext(Ctx)
 

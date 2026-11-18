@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { LogIn, LogOut } from 'lucide-react'
-import { byId, useClubs, useCoaches, usePriceScale, useRules, useSeasons } from '../lib/data'
+import { byId, useClubs, usePriceScale, useRules, useSeasons } from '../lib/data'
 import { BASE, fmtDate, fmtMoney, fmtNumber } from '../lib/format'
 import { googleEnabled, useAuth } from '../lib/auth'
 import { must, supabase } from '../lib/supabase'
@@ -49,7 +49,7 @@ export function Rules() {
 }
 
 export function Login() {
-  const { session, profile, signOut } = useAuth(); const go = useNavigate()
+  const { session, profile, signOut, clubId } = useAuth(); const go = useNavigate(); const clubs = byId(useClubs().data)
   const [state, setState] = useState<'idle' | 'busy' | 'off' | 'error'>('idle')
   const start = async () => {
     setState('busy')
@@ -62,27 +62,13 @@ export function Login() {
   return <div className="login">
     <img src={`${BASE}brand/logo.webp`} alt="" width="86" height="125" />
     <h1>{session ? (profile?.display_name ?? 'Tu cuenta') : 'Ingresar a NG League'}</h1>
-    {session ? <><p>{profile?.role === 'admin' ? 'Administrador' : profile?.role === 'dt' ? 'Director técnico' : 'Tu cuenta todavía no está vinculada a un club.'}</p><button className="btn" onClick={async () => { await signOut(); go('/') }}><LogOut size={16} aria-hidden="true" />Cerrar sesión</button></> : <>
+    {session ? <><p>{profile?.role === 'admin' ? 'Administrador' : clubId ? `Director técnico de ${clubs.get(clubId)?.name ?? 'tu club'}` : 'Tu cuenta todavía no está vinculada a un club.'}</p>{profile?.role === 'admin' && <Link className="btn btn--primary" to="/administracion">Ir al panel</Link>}<Link className="btn" to="/plantillas">Ir a plantillas</Link><button className="btn" onClick={async () => { await signOut(); go('/') }}><LogOut size={16} aria-hidden="true" />Cerrar sesión</button></> : <>
       <p>Los directores técnicos y el administrador ingresan con su cuenta de Google.</p>
       <button className="btn btn--primary" disabled={state === 'busy'} onClick={start}><LogIn size={16} aria-hidden="true" />{state === 'busy' ? 'Conectando' : 'Continuar con Google'}</button>
       {state === 'off' && <p className="form-msg" role="alert">El ingreso con Google todavía no está activado en este proyecto.</p>}
       {state === 'error' && <p className="form-msg" role="alert">No se pudo iniciar sesión. Intentá de nuevo.</p>}
     </>}
   </div>
-}
-
-export function Admin() {
-  const { session, ready, profile } = useAuth(); const clubs = useClubs(); const coaches = useCoaches(); const seasons = useSeasons()
-  const users = useQuery({ queryKey: ['admin-users'], enabled: profile?.role === 'admin', queryFn: async () => must(await supabase.rpc('admin_list_users')) as { id: string; email: string | null; display_name: string | null; role: string; club_id: number | null }[] })
-  if (!ready) return <Loading />
-  if (!session) return <Empty title="Este panel requiere una cuenta de administrador." action={<Link className="btn btn--primary" to="/ingresar">Ingresar</Link>} />
-  if (profile && profile.role !== 'admin') return <Empty title="Tu cuenta no tiene acceso a la administración." action={<Link className="btn" to="/">Volver al inicio</Link>} />
-  const map = byId(clubs.data); const cur = seasons.data?.find((s) => s.is_current)
-  return <>
-    <PageHead title="Panel de administración" lead={`Temporada ${cur?.number ?? ''}`} />
-    <div className="format"><div><b>{clubs.data?.length ?? 0}</b><span>clubes</span></div><div><b>{coaches.data?.length ?? 0}</b><span>directores técnicos</span></div><div><b>{users.data?.length ?? 0}</b><span>cuentas registradas</span></div></div>
-    <Section title="Usuarios"><Q q={users}>{(rows) => <div className="table-wrap"><table className="table"><thead><tr><th scope="col">Nombre</th><th scope="col" className="hide-sm">Correo</th><th scope="col">Rol</th><th scope="col">Club</th></tr></thead><tbody>{rows.map((u) => <tr key={u.id}><td>{u.display_name}</td><td className="hide-sm">{u.email}</td><td>{u.role === 'admin' ? 'Administrador' : u.role === 'dt' ? 'DT' : 'Visitante'}</td><td>{u.club_id ? <ClubLink club={map.get(u.club_id)} size={20} /> : <span className="muted">Sin club</span>}</td></tr>)}</tbody></table></div>}</Q></Section>
-  </>
 }
 
 export function NotFound() {

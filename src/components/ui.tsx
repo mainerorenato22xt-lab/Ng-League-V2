@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { AlertTriangle, RotateCw } from 'lucide-react'
@@ -138,3 +138,14 @@ export const titleColumns = [
   { title: 'Semifinales', ties: [{ code: 'S1', homeLabel: '1.º de la tabla', awayLabel: 'Ganador 4.º-5.º' }, { code: 'S2', homeLabel: '2.º de la tabla', awayLabel: 'Ganador 3.º-6.º' }] },
   { title: 'Final', ties: [{ code: 'F', homeLabel: 'Ganador semifinal 1', awayLabel: 'Ganador semifinal 2' }] },
 ]
+
+export function toast(message: string, kind: 'ok' | 'error' = 'ok') { dispatchEvent(new CustomEvent('ngl-toast', { detail: { message, kind } })) }
+export function Toaster() {
+  const [item, setItem] = useState<{ message: string; kind: string } | null>(null)
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>
+    const on = (e: Event) => { setItem((e as CustomEvent).detail); clearTimeout(timer); timer = setTimeout(() => setItem(null), 4200) }
+    addEventListener('ngl-toast', on); return () => { removeEventListener('ngl-toast', on); clearTimeout(timer) }
+  }, [])
+  return item ? <div className={`toast toast--${item.kind}`} role="status">{item.message}</div> : null
+}

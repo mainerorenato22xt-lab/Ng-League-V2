@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { byId, useClubs, useMatches, useRules, useSeasonClubs, useSeasons, useStandings, type Match, type Season } from '../lib/data'
 import { fmtDate, PHASE_LABEL } from '../lib/format'
 import { must, supabase } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
+import { ResultForm } from '../components/ResultForm'
 import { Bracket, ClubLink, Crest, Empty, ErrorState, Field, Loading, MatchRow, PageHead, Q, Section, StandingsTable, titleColumns, ZoneLegend } from '../components/ui'
 
 function useSelectedSeason() {
@@ -93,6 +95,7 @@ export function Fixture() {
 }
 
 export function MatchPage() {
+  const { isAdmin } = useAuth()
   const { id } = useParams(); const clubsQ = useClubs(); const clubs = byId(clubsQ.data); const seasons = useSeasons()
   const q = useQuery({ queryKey: ['match', id], queryFn: async () => must(await supabase.from('matches').select('*').eq('id', Number(id)).maybeSingle()) as Match | null })
   const events = useQuery({ queryKey: ['events', id], queryFn: async () => must(await supabase.from('match_events').select('id,kind,club_id,minute,raw_player_name,player:players(id,name)').eq('match_id', Number(id)).order('minute')) as unknown as { id: number; kind: string; club_id: number; minute: number | null; raw_player_name: string | null; player: { id: number; name: string } | null }[] })
@@ -109,6 +112,7 @@ export function MatchPage() {
         <div><Crest club={a} size={76} />{a ? <Link to={`/clubes/${a.slug}`}>{a.name}</Link> : 'Por definir'}</div>
       </section>
       <p className="note note--center">{m.scheduled_at ? fmtDate(m.scheduled_at) : 'Sin fecha registrada'}</p>
+      {isAdmin && h && a && <Section title="Cargar resultado"><ResultForm match={m} home={h} away={a} /></Section>}
       <Section title="Detalle del partido"><Q q={events}>{(ev) => ev.length ? <ul className="plain-list">{ev.map((e) => <li key={e.id}><Crest club={clubs.get(e.club_id)} size={20} />{label[e.kind]}: {e.player ? <Link to={`/jugadores/${e.player.id}`}>{e.player.name}</Link> : e.raw_player_name}{e.minute != null && ` (${e.minute}')`}</li>)}</ul> : <Empty title="No hay goleadores ni tarjetas registrados para este partido." />}</Q></Section>
     </>
   }}</Q>

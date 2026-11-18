@@ -12,9 +12,9 @@ const history = () => import('./pages/History')
 const portal = () => import('./pages/Portal')
 const Division = p(competition, 'Division'); const Fixture = p(competition, 'Fixture'); const MatchPage = p(competition, 'MatchPage'); const Standings = p(competition, 'Standings')
 const ClubsPage = p(clubs, 'ClubsPage'); const ClubPage = p(clubs, 'ClubPage'); const Coaches = p(clubs, 'Coaches'); const CoachPage = p(clubs, 'CoachPage')
-const PlayersPage = p(players, 'PlayersPage'); const PlayerPage = p(players, 'PlayerPage'); const Squads = p(players, 'Squads')
+const PlayersPage = p(players, 'PlayersPage'); const PlayerPage = p(players, 'PlayerPage'); const Squads = p(() => import('./pages/Squads'), 'Squads')
 const Champions = p(history, 'Champions'); const Seasons = p(history, 'Seasons'); const SeasonPage = p(history, 'SeasonPage'); const Records = p(history, 'Records')
-const Market = p(portal, 'Market'); const News = p(portal, 'News'); const Rules = p(portal, 'Rules'); const Admin = p(portal, 'Admin'); const Login = p(portal, 'Login'); const NotFound = p(portal, 'NotFound')
+const Market = p(portal, 'Market'); const News = p(portal, 'News'); const Rules = p(portal, 'Rules'); const Admin = p(() => import('./pages/Admin'), 'Admin'); const Login = p(portal, 'Login'); const NotFound = p(portal, 'NotFound')
 
 export function App() {
   return (

@@ -6,7 +6,7 @@ import { useClubs, useCoaches } from '../lib/data'
 import { BASE, normalize } from '../lib/format'
 import { useAuth } from '../lib/auth'
 import { must, supabase } from '../lib/supabase'
-import { Crest, Rating } from './ui'
+import { Crest, Rating, Toaster } from './ui'
 
 type Item = { to: string; label: string; icon: LucideIcon; end?: boolean }
 const NAV: { title: string; items: Item[] }[] = [
@@ -90,7 +90,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <nav className="strip" aria-label="Clubes">{strip.map((c) => <NavLink key={c.id} to={`/clubes/${c.slug}`} title={c.name} aria-label={c.name}><Crest club={c} size={30} /></NavLink>)}</nav>
           <div className="topbar__tools">
             <button className="search-trigger" onClick={() => setSearch(true)} aria-label="Buscar"><Search size={17} aria-hidden="true" /><span>Buscar</span><kbd>/</kbd></button>
-            <NavLink className="account" to={session ? '/administracion' : '/ingresar'}><CircleUser size={19} aria-hidden="true" /><span>{account}</span></NavLink>
+            <NavLink className="account" to="/ingresar"><CircleUser size={19} aria-hidden="true" /><span>{account}</span></NavLink>
           </div>
         </header>
         <main id="contenido" key={loc.pathname} className="content">{children}</main>
@@ -107,6 +107,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </div>}
       {search && <SearchDialog onClose={() => setSearch(false)} />}
+      <Toaster />
     </div>
   )
 }

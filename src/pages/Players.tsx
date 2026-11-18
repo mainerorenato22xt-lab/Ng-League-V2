@@ -1,16 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react'
-import { byId, useClubs, useSummaries, type PlayerRow } from '../lib/data'
-import { ATTRIBUTE_GROUPS, BASE, fmtDec, fmtMoney, normalize } from '../lib/format'
+import { byId, useClubs, type PlayerRow } from '../lib/data'
+import { ATTRIBUTE_GROUPS, fmtMoney, normalize } from '../lib/format'
 import { must, supabase } from '../lib/supabase'
-import { useAuth } from '../lib/auth'
-import { Avatar, ClubLink, Crest, Empty, Facts, Field, Loading, PageHead, Q, Rating, Section } from '../components/ui'
+import { Avatar, ClubLink, Empty, Facts, Field, PageHead, Q, Rating, Section } from '../components/ui'
 
 const PAGE = 40
 type Position = { id: number; code: string; name: string; line: string }
-const usePositions = () => useQuery({ queryKey: ['positions'], staleTime: Infinity, queryFn: async () => must(await supabase.from('positions').select('*').order('id')) as Position[] })
+export const usePositions = () => useQuery({ queryKey: ['positions'], staleTime: Infinity, queryFn: async () => must(await supabase.from('positions').select('*').order('id')) as Position[] })
 const useCountries = () => useQuery({ queryKey: ['countries'], staleTime: Infinity, queryFn: async () => must(await supabase.from('countries').select('id,name').not('name', 'is', null).order('name')) as { id: number; name: string }[] })
 const EMPTY = { q: '', country: '', position: '', ageMin: '', ageMax: '', ovrMin: '', ovrMax: '', priceMax: '', club: '', status: '', sort: 'overall.desc' }
 
@@ -92,55 +91,4 @@ export function PlayerPage() {
       </div>
     </>
   }}</Q>
-}
-
-type Adjustment = { id: number; action: 'incorporate' | 'remove'; player: { id: number; name: string; overall: number } }
-function PendingSquad({ clubId }: { clubId: number }) {
-  const { session, profile } = useAuth(); const qc = useQueryClient(); const uid = session?.user.id
-  const items = useQuery({ queryKey: ['adjustments', clubId], queryFn: async () => must(await supabase.from('squad_adjustments').select('id,action,player:players(id,name,overall)').eq('club_id', clubId).eq('status', 'pending').order('action', { ascending: false })) as unknown as Adjustment[] })
-  const mine = useQuery({ queryKey: ['my-club', uid], enabled: !!uid, queryFn: async () => (must(await supabase.from('coaches').select('coach_tenures(club_id,is_current)').eq('profile_id', uid!).maybeSingle()) as { coach_tenures: { club_id: number; is_current: boolean }[] } | null)?.coach_tenures.find((t) => t.is_current)?.club_id ?? null })
-  const apply = useMutation({
-    mutationFn: async (id: number) => { const { error } = await supabase.rpc('apply_squad_adjustment', { p_id: id }); if (error) throw new Error(error.message) },
-    onSuccess: () => { for (const key of ['adjustments', 'lineup', 'summaries', 'club-squad']) qc.invalidateQueries({ queryKey: [key] }) },
-  })
-  if (!items.data?.length) return null
-  const canAct = profile?.role === 'admin' || mine.data === clubId
-  const group = (action: Adjustment['action']) => items.data!.filter((i) => i.action === action)
-  const row = (i: Adjustment) => <li key={i.id}><Rating value={i.player.overall} /><Link to={`/jugadores/${i.player.id}`}>{i.player.name}</Link>{canAct && <button className="btn btn--small push" disabled={apply.isPending} onClick={() => { if (i.action === 'incorporate' || confirm(`¿Quitar a ${i.player.name} de la plantilla? No se acredita dinero.`)) apply.mutate(i.id) }}>{i.action === 'incorporate' ? 'Incorporar' : 'Quitar'}</button>}</li>
-  return <Section title="Por completar" className="section--tint">
-    {group('remove').length > 0 && <><h3 className="mini-head">Ya vendidos, deben salir</h3><ul className="plain-list">{group('remove').map(row)}</ul></>}
-    {group('incorporate').length > 0 && <><h3 className="mini-head">Ya pagados, reservados para el club</h3><ul className="plain-list">{group('incorporate').map(row)}</ul></>}
-    <p className="note">Estas operaciones no mueven dinero: ya se registraron en la web anterior.</p>
-    {apply.isError && <p className="form-msg" role="alert">{apply.error.message}</p>}
-  </Section>
-}
-
-type Slot = { slot: number; x: number | null; y: number | null; position_id: number | null; player: { id: number; name: string; overall: number; age: number | null } | null }
-export function Squads() {
-  const clubsQ = useClubs(); const sums = useSummaries(); const positions = usePositions(); const [params, setParams] = useSearchParams()
-  const list = useMemo(() => (clubsQ.data ?? []).filter((c) => c.is_active), [clubsQ.data])
-  const club = list.find((c) => c.slug === params.get('club')) ?? list.find((c) => c.id === 1) ?? list[0]
-  const lineup = useQuery({ queryKey: ['lineup', club?.id], enabled: !!club, queryFn: async () => must(await supabase.from('lineups').select('id,formation,status,seasons!inner(is_current),lineup_slots(slot,x,y,position_id,player:players(id,name,overall,age))').eq('club_id', club!.id).eq('seasons.is_current', true).maybeSingle()) as unknown as { formation: string; status: string; lineup_slots: Slot[] } | null })
-  if (clubsQ.isPending) return <Loading />
-  const s = sums.data?.find((x) => x.club_id === club?.id)
-  const code = (id: number | null) => positions.data?.find((p) => p.id === id)?.code ?? ''
-  const short = (n: string) => n.split(' ').slice(-1)[0]
-  return <>
-    <PageHead title="Armado de plantillas" lead="Formación, titulares, suplentes y valor de cada plantel."><Field label="Club"><select value={club?.slug} onChange={(e) => setParams({ club: e.target.value })}>{list.map((c) => <option key={c.id} value={c.slug}>{c.name}</option>)}</select></Field></PageHead>
-    <div className="squad-stats">{([['Jugadores', `${s?.players ?? 0}/18`], ['Media', fmtDec(s?.avg_overall)], ['Defensa', fmtDec(s?.avg_defense)], ['Mediocampo', fmtDec(s?.avg_midfield)], ['Ataque', fmtDec(s?.avg_attack)], ['Edad', fmtDec(s?.avg_age)], ['Valor', fmtMoney(s?.squad_value)]] as const).map(([k, v]) => <div key={k}><b>{v}</b><span>{k}</span></div>)}</div>
-    <Q q={lineup}>{(l) => {
-      if (!l) return <Empty title="Este club todavía no armó su plantilla." />
-      const slots = [...l.lineup_slots].sort((a, b) => a.slot - b.slot); const starters = slots.filter((x) => x.slot < 11); const bench = slots.filter((x) => x.slot >= 11)
-      return <div className="squad">
-        <div className="pitch" role="img" aria-label={`Formación ${l.formation} de ${club?.name}`} style={{ backgroundImage: `url(${BASE}brand/cancha.svg)` }}>
-          {starters.map((x) => <div className={`pitch__player ${x.player ? '' : 'is-empty'}`} key={x.slot} style={{ left: `${x.x}%`, top: `${x.y}%` }}>{x.player ? <Link to={`/jugadores/${x.player.id}`}><b>{x.player.overall}</b><span>{short(x.player.name)}</span></Link> : <span>Vacío</span>}<small>{code(x.position_id)}</small></div>)}
-        </div>
-        <div>
-          <div className="squad__meta"><Crest club={club} size={40} /><div><b>{club?.name}</b><span>{l.formation}, {l.status === 'submitted' ? 'plantilla entregada' : 'en armado'}</span></div></div>
-          {club && <PendingSquad clubId={club.id} />}
-          <Section title="Suplentes"><ul className="plain-list">{bench.map((x) => <li key={x.slot}>{x.player ? <><Rating value={x.player.overall} /><Link to={`/jugadores/${x.player.id}`}>{x.player.name}</Link></> : <span className="muted">Puesto libre</span>}</li>)}</ul></Section>
-        </div>
-      </div>
-    }}</Q>
-  </>
 }
