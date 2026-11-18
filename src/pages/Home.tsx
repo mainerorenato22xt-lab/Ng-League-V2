@@ -43,7 +43,7 @@ export function Home() {
     <div className="home">
       <div className="bento">
         <section className="hero">
-          <img className="hero__photo" src={`${BASE}brand/portada.jpg`} alt="Plantel campeón de NG League con el trofeo" width="1600" height="900" />
+          <img className="hero__photo" src={`${BASE}brand/portada.jpg`} alt="Plantel de Deportivo Athuel con el trofeo de campeón" width="1360" height="768" />
           <div className="hero__copy">
             <span className="chip">{STATUS[current?.status ?? 'draft']}</span>
             <h1>Temporada {current?.number}</h1>
