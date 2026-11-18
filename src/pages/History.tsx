@@ -11,15 +11,18 @@ export function Champions() {
     <PageHead title="Historial de campeones" lead="Palmarés de NG League, temporada por temporada." />
     <Q q={honours}>{(rows) => <ol className="honours">{rows.filter((r) => r.titles > 0).map((r, i) => <li key={r.club_id} style={{ '--w': `${(r.titles / rows[0].titles) * 100}%` } as React.CSSProperties}><span className="honours__pos">{i + 1}</span><ClubLink club={clubs.get(r.club_id)} size={38} /><b>{r.titles}</b></li>)}</ol>}</Q>
     <Section title="Por temporada"><Q q={seasons}>{(list) => <div className="table-wrap"><table className="table"><thead><tr><th scope="col">Temporada</th><th scope="col">Campeón</th><th scope="col" className="hide-sm">Subcampeón</th><th scope="col" className="hide-sm">Final</th></tr></thead><tbody>{list.filter((s) => !s.is_current).map((s) => { const a = archives.data?.find((x) => x.season_id === s.id); return <tr key={s.id}><td><Link to={`/temporadas/${s.number}`}>Temporada {s.number}</Link></td><td>{a?.champion_club ? <ClubLink club={clubs.get(a.champion_club)} size={24} /> : <span className="muted">Sin registro</span>}</td><td className="hide-sm">{a?.runner_up_club ? <ClubLink club={clubs.get(a.runner_up_club)} size={24} /> : <span className="muted">Sin registro</span>}</td><td className="hide-sm">{a?.final_score ?? <span className="muted">Sin registro</span>}</td></tr> })}</tbody></table></div>}</Q>
-      <p className="note">Los totales de las temporadas 1 a 7 vienen del palmarés anterior, que no indica qué club ganó cada edición.</p></Section>
+      <p className="note">De las temporadas 1 a 7 por ahora solo está registrado el campeón.</p></Section>
   </>
 }
 
 export function Seasons() {
-  const seasons = useSeasons(); const archives = useArchives(); const clubs = byId(useClubs().data)
+  const seasons = useSeasons(); const archives = useArchives(); const clubs = byId(useClubs().data); const honours = useHonours()
+  const relegated = [...(honours.data ?? [])].filter((h) => h.symbolic_relegations > 0).sort((x, y) => y.symbolic_relegations - x.symbolic_relegations || x.club_name.localeCompare(y.club_name))
+  const total = relegated.reduce((n, h) => n + h.symbolic_relegations, 0); const dated = (archives.data ?? []).reduce((n, a) => n + a.relegated_clubs.length, 0)
   return <>
     <PageHead title="Historial de temporadas" lead="Archivo de cada edición de NG League." />
     <Q q={seasons}>{(list) => <div className="season-list">{list.map((s) => { const a = archives.data?.find((x) => x.season_id === s.id); const c = a?.champion_club ? clubs.get(a.champion_club) : null; return <Link key={s.id} to={`/temporadas/${s.number}`}><b>{s.number}</b><span>{s.is_current ? 'Temporada actual' : c ? c.name : 'Sin registro detallado'}</span>{c && <Crest club={c} size={32} />}</Link> })}</div>}</Q>
+    {relegated.length > 0 && <Section title="Descensos simbólicos"><ol className="honours">{relegated.map((h, i) => <li key={h.club_id} style={{ '--w': `${(h.symbolic_relegations / relegated[0].symbolic_relegations) * 100}%` } as React.CSSProperties}><span className="honours__pos">{i + 1}</span><ClubLink club={clubs.get(h.club_id)} size={38} /><b>{h.symbolic_relegations}</b></li>)}</ol>{total > dated && <p className="note">Son los totales por club. Falta registrar en qué temporada ocurrieron {total - dated} de los {total}.</p>}</Section>}
   </>
 }
 
@@ -31,7 +34,10 @@ export function SeasonPage() {
   if (!season) return <Empty title="Esta temporada no existe." action={<Link className="btn" to="/temporadas">Ver temporadas</Link>} />
   const a = archives.data?.find((x) => x.season_id === season.id); const label: Record<string, string> = { mvp: 'Mejor jugador', revelation: 'Jugador revelación', coach: 'Mejor DT', bettor: 'Rey de las apuestas' }
   const hasTable = table.data?.length && (season.is_current || season.status === 'closed')
-  if (season.data_quality === 'missing') return <><PageHead title={`Temporada ${season.number}`} /><Empty title="Esta temporada no tiene datos detallados.">La web anterior solo conservó el total de títulos por club. Se puede completar desde el panel de administración.</Empty></>
+  if (season.data_quality === 'missing' || season.data_quality === 'partial') {
+    const champion = a?.champion_club ? clubs.get(a.champion_club) : null
+    return <><PageHead title={`Temporada ${season.number}`} />{champion && <div className="season-champ"><Crest club={champion} size={68} /><div><small>Campeón</small><b>{champion.name}</b></div></div>}<Section title="Detalle de la temporada"><Empty title="Todavía no hay tabla, partidos ni premios registrados.">Se pueden sumar cuando estén disponibles.</Empty></Section></>
+  }
   return <>
     <PageHead title={`Temporada ${season.number}`} lead={season.is_current ? 'Temporada actual' : undefined} />
     {a?.champion_club && <div className="season-champ"><Crest club={clubs.get(a.champion_club)} size={68} /><div><small>Campeón</small><b>{clubs.get(a.champion_club)?.name}</b></div>{a.final_score && <p>Final: {a.final_score}</p>}</div>}
