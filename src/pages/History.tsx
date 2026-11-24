@@ -11,7 +11,7 @@ export function Champions() {
     <PageHead title="Historial de campeones" lead="Palmarés de NG League, temporada por temporada." />
     <Q q={honours}>{(rows) => <ol className="honours">{rows.filter((r) => r.titles > 0).map((r, i) => <li key={r.club_id} style={{ '--w': `${(r.titles / rows[0].titles) * 100}%` } as React.CSSProperties}><span className="honours__pos">{i + 1}</span><ClubLink club={clubs.get(r.club_id)} size={38} /><b>{r.titles}</b></li>)}</ol>}</Q>
     <Section title="Por temporada"><Q q={seasons}>{(list) => <div className="table-wrap"><table className="table"><thead><tr><th scope="col">Temporada</th><th scope="col">Campeón</th><th scope="col" className="hide-sm">Subcampeón</th><th scope="col" className="hide-sm">Final</th></tr></thead><tbody>{list.filter((s) => !s.is_current).map((s) => { const a = archives.data?.find((x) => x.season_id === s.id); return <tr key={s.id}><td><Link to={`/temporadas/${s.number}`}>Temporada {s.number}</Link></td><td>{a?.champion_club ? <ClubLink club={clubs.get(a.champion_club)} size={24} /> : <span className="muted">Sin registro</span>}</td><td className="hide-sm">{a?.runner_up_club ? <ClubLink club={clubs.get(a.runner_up_club)} size={24} /> : <span className="muted">Sin registro</span>}</td><td className="hide-sm">{a?.final_score ?? <span className="muted">Sin registro</span>}</td></tr> })}</tbody></table></div>}</Q>
-      <p className="note">De las temporadas 1 a 7 por ahora solo está registrado el campeón.</p></Section>
+      <p className="note">De las temporadas 1 a 7 están registrados el campeón y el descenso.</p></Section>
   </>
 }
 
@@ -36,7 +36,7 @@ export function SeasonPage() {
   const hasTable = table.data?.length && (season.is_current || season.status === 'closed')
   if (season.data_quality === 'missing' || season.data_quality === 'partial') {
     const champion = a?.champion_club ? clubs.get(a.champion_club) : null
-    return <><PageHead title={`Temporada ${season.number}`} />{champion && <div className="season-champ"><Crest club={champion} size={68} /><div><small>Campeón</small><b>{champion.name}</b></div></div>}<Section title="Detalle de la temporada"><Empty title="Todavía no hay tabla, partidos ni premios registrados.">Se pueden sumar cuando estén disponibles.</Empty></Section></>
+    return <><PageHead title={`Temporada ${season.number}`} />{champion && <div className="season-champ"><Crest club={champion} size={68} /><div><small>Campeón</small><b>{champion.name}</b></div></div>}{!!a?.relegated_clubs.length && <Section title="Descendió"><ul className="plain-list">{a.relegated_clubs.map((id) => <li key={id}><ClubLink club={clubs.get(id)} size={22} /></li>)}</ul></Section>}<Section title="Detalle de la temporada"><Empty title="Todavía no hay tabla, partidos ni premios registrados.">Se pueden sumar cuando estén disponibles.</Empty></Section></>
   }
   return <>
     <PageHead title={`Temporada ${season.number}`} lead={season.is_current ? 'Temporada actual' : undefined} />
