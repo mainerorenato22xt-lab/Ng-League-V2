@@ -18,11 +18,12 @@ export function Champions() {
 export function Seasons() {
   const seasons = useSeasons(); const archives = useArchives(); const clubs = byId(useClubs().data); const honours = useHonours()
   const relegated = [...(honours.data ?? [])].filter((h) => h.symbolic_relegations > 0).sort((x, y) => y.symbolic_relegations - x.symbolic_relegations || x.club_name.localeCompare(y.club_name))
+  const unconfirmed = (seasons.data ?? []).filter((x) => x.status === 'closed' && !archives.data?.find((y) => y.season_id === x.id)?.relegated_clubs.length).map((x) => x.number).sort((x, y) => x - y)
   const total = relegated.reduce((n, h) => n + h.symbolic_relegations, 0); const dated = (archives.data ?? []).reduce((n, a) => n + a.relegated_clubs.length, 0)
   return <>
     <PageHead title="Historial de temporadas" lead="Archivo de cada edición de NG League." />
     <Q q={seasons}>{(list) => <div className="season-list">{list.map((s) => { const a = archives.data?.find((x) => x.season_id === s.id); const c = a?.champion_club ? clubs.get(a.champion_club) : null; return <Link key={s.id} to={`/temporadas/${s.number}`}><b>{s.number}</b><span>{s.is_current ? 'Temporada actual' : c ? c.name : 'Sin registro detallado'}</span>{c && <Crest club={c} size={32} />}</Link> })}</div>}</Q>
-    {relegated.length > 0 && <Section title="Descensos simbólicos"><ol className="honours">{relegated.map((h, i) => <li key={h.club_id} style={{ '--w': `${(h.symbolic_relegations / relegated[0].symbolic_relegations) * 100}%` } as React.CSSProperties}><span className="honours__pos">{i + 1}</span><ClubLink club={clubs.get(h.club_id)} size={38} /><b>{h.symbolic_relegations}</b></li>)}</ol>{total > dated && <p className="note">Son los totales por club. Falta registrar en qué temporada ocurrieron {total - dated} de los {total}.</p>}</Section>}
+    {relegated.length > 0 && <Section title="Descensos"><ol className="honours">{relegated.map((h, i) => <li key={h.club_id} style={{ '--w': `${(h.symbolic_relegations / relegated[0].symbolic_relegations) * 100}%` } as React.CSSProperties}><span className="honours__pos">{i + 1}</span><ClubLink club={clubs.get(h.club_id)} size={38} /><b>{h.symbolic_relegations}</b></li>)}</ol>{total > dated && <p className="note">Son los totales por club. Falta registrar en qué temporada ocurrieron {total - dated} de los {total}.</p>}{!!unconfirmed.length && <p className="note">Descenso sin confirmar: temporada {unconfirmed.join(', ')}.</p>}</Section>}
   </>
 }
 
@@ -36,7 +37,7 @@ export function SeasonPage() {
   const hasTable = table.data?.length && (season.is_current || season.status === 'closed')
   if (season.data_quality === 'missing' || season.data_quality === 'partial') {
     const champion = a?.champion_club ? clubs.get(a.champion_club) : null
-    return <><PageHead title={`Temporada ${season.number}`} />{champion && <div className="season-champ"><Crest club={champion} size={68} /><div><small>Campeón</small><b>{champion.name}</b></div></div>}{!!a?.relegated_clubs.length && <Section title="Descendió"><ul className="plain-list">{a.relegated_clubs.map((id) => <li key={id}><ClubLink club={clubs.get(id)} size={22} /></li>)}</ul></Section>}<Section title="Detalle de la temporada"><Empty title="Todavía no hay tabla, partidos ni premios registrados.">Se pueden sumar cuando estén disponibles.</Empty></Section></>
+    return <><PageHead title={`Temporada ${season.number}`} />{champion && <div className="season-champ"><Crest club={champion} size={68} /><div><small>Campeón</small><b>{champion.name}</b></div></div>}<Section title="Descendió">{a?.relegated_clubs.length ? <ul className="plain-list">{a.relegated_clubs.map((id) => <li key={id}><ClubLink club={clubs.get(id)} size={22} /></li>)}</ul> : <p className="muted">Sin confirmar</p>}</Section><Section title="Detalle de la temporada"><Empty title="Todavía no hay tabla, partidos ni premios registrados.">Se pueden sumar cuando estén disponibles.</Empty></Section></>
   }
   return <>
     <PageHead title={`Temporada ${season.number}`} lead={season.is_current ? 'Temporada actual' : undefined} />
@@ -45,7 +46,7 @@ export function SeasonPage() {
       <div>
         <Section title="Tabla">{hasTable ? <><StandingsTable rows={table.data!} clubs={clubs} /><ZoneLegend count={table.data!.length} /></> : <Loading />}</Section>
         <Section title="Playoffs por el título"><Q q={matches}>{(m) => <Bracket columns={titleColumns} matches={m} clubs={clubs} />}</Q></Section>
-        <Section title="Descenso simbólico"><Q q={matches}>{(m) => <Bracket columns={relegationColumns(season)} matches={m} clubs={clubs} />}</Q></Section>
+        <Section title="Descensos"><Q q={matches}>{(m) => <Bracket columns={relegationColumns(season)} matches={m} clubs={clubs} />}</Q></Section>
       </div>
       <aside>
         <Section title="Goleadores" className="section--tint"><Q q={scorers}>{(rows) => rows.length ? <ul className="plain-list">{rows.map((s) => <li key={s.raw_player_name}><Crest club={clubs.get(s.club_id)} size={20} />{s.raw_player_name}<b className="push">{s.goals}</b></li>)}</ul> : <Empty title="Sin goleadores registrados." />}</Q></Section>

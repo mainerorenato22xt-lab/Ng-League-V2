@@ -36,13 +36,13 @@ export function Division() {
     <>
       <PageHead title="Primera división" lead="Una sola división, todos contra todos y playoffs a partido único.">{select}</PageHead>
       <div className="format">
-        <div><b>{n}</b><span>clubes</span></div><div><b>{rounds}</b><span>fechas</span></div><div><b>6</b><span>clasifican a playoffs</span></div><div><b>4</b><span>juegan el descenso simbólico</span></div>
+        <div><b>{n}</b><span>clubes</span></div><div><b>{rounds}</b><span>fechas</span></div><div><b>6</b><span>clasifican a playoffs</span></div><div><b>4</b><span>juegan por el descenso</span></div>
       </div>
       <Section title="Participantes"><div className="club-grid">{(ids.data ?? []).map((id) => clubs.get(id)).filter(Boolean).sort((a, b) => a!.name.localeCompare(b!.name)).map((c) => <ClubLink key={c!.id} club={c} size={30} />)}</div></Section>
       <Section title="Playoffs por el título"><Q q={matches}>{(m) => <Bracket columns={titleColumns} matches={m} clubs={clubs} />}</Q></Section>
-      <Section title="Playoffs de descenso simbólico">
+      <Section title="Playoffs por el descenso">
         <Q q={matches}>{(m) => <Bracket columns={relegationColumns(season, n || 11)} matches={m} clubs={clubs} />}</Q>
-        <p className="note">{season?.number === 8 ? 'La temporada 8 usó el formato anterior, con final de descenso.' : 'Los perdedores de ambos cruces reciben un descenso simbólico, sin consecuencias para la edición siguiente.'}{rules.data && n < 10 && ' Con menos de 10 clubes, el administrador define los cruces.'}</p>
+        <p className="note">{season?.number === 8 ? 'La temporada 8 usó el formato anterior, con final de descenso.' : 'Los perdedores de ambos cruces suman un descenso, sin consecuencias para la edición siguiente.'}{rules.data && n < 10 && ' Con menos de 10 clubes, el administrador define los cruces.'}</p>
       </Section>
     </>
   )

@@ -92,7 +92,7 @@ export function StandingsTable({ rows, clubs, compact = false }: { rows: Row[]; 
 }
 
 export function ZoneLegend({ count }: { count: number }) {
-  return <p className="legend"><span><i className="is-title" />Playoffs por el título</span>{count >= 10 && <span><i className="is-rel" />Playoffs de descenso simbólico</span>}</p>
+  return <p className="legend"><span><i className="is-title" />Playoffs por el título</span>{count >= 10 && <span><i className="is-rel" />Playoffs por el descenso</span>}</p>
 }
 
 export function MatchRow({ m, clubs }: { m: Match; clubs: Map<number, Club> }) {
