@@ -1,23 +1,14 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import { LogIn, LogOut } from 'lucide-react'
 import { byId, useClubs, usePriceScale, useRules, useSeasons } from '../lib/data'
-import { BASE, fmtDate, fmtMoney, fmtNumber } from '../lib/format'
+import { BASE, fmtMoney, fmtNumber } from '../lib/format'
 import { googleEnabled, useAuth } from '../lib/auth'
-import { must, supabase } from '../lib/supabase'
-import { Crest, Empty, Facts, PageHead, Q, Section } from '../components/ui'
+import { supabase } from '../lib/supabase'
+import { Empty, Facts, PageHead, Q, Section } from '../components/ui'
 
 const useCurrent = () => { const s = useSeasons(); return s.data?.find((x) => x.is_current) }
 
-export function News() {
-  const clubs = byId(useClubs().data)
-  const q = useQuery({ queryKey: ['news'], queryFn: async () => must(await supabase.from('news_posts').select('*').eq('status', 'published').order('published_at', { ascending: false }).limit(40)) as { id: number; title: string | null; body: string; club_id: number | null; author_name: string; published_at: string }[] })
-  return <>
-    <PageHead title="Noticias" lead="Novedades oficiales y de cada club." />
-    <Q q={q}>{(rows) => rows.length ? <div className="news-feed">{rows.map((n) => <article key={n.id}><header>{n.club_id && <Crest club={clubs.get(n.club_id)} size={30} />}<div><b>{n.title ?? clubs.get(n.club_id ?? 0)?.name ?? 'NG League'}</b><small>{n.author_name}, {fmtDate(n.published_at)}</small></div></header><p className="prose">{n.body}</p></article>)}</div> : <Empty title="Todavía no hay noticias publicadas." />}</Q>
-  </>
-}
 
 export function Rules() {
   const season = useCurrent(); const rules = useRules(season?.id); const prices = usePriceScale(season?.id)

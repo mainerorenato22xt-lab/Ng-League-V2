@@ -16,7 +16,7 @@ export function Home() {
   const currentMatches = useMatches(current?.id); const lastMatches = useMatches(last?.id)
   const currentTable = useStandings(current); const lastTable = useStandings(last)
   const scorers = useScorers(last?.id); const awards = useAwards(last?.id)
-  const news = useQuery({ queryKey: ['home-news'], queryFn: async () => must(await supabase.from('news_posts').select('id,title,body,club_id,published_at').eq('status', 'published').order('published_at', { ascending: false }).limit(3)) as { id: number; title: string | null; body: string; club_id: number | null; published_at: string }[] })
+  const news = useQuery({ queryKey: ['home-news'], queryFn: async () => must(await supabase.from('news_feed').select('id,title,body,club_id,published_at,is_auto').eq('status', 'published').eq('is_auto', false).order('published_at', { ascending: false }).limit(4)) as { id: number; title: string | null; body: string; club_id: number | null; published_at: string; is_auto: boolean }[] })
   const moves = useQuery({ queryKey: ['home-moves'], queryFn: async () => must(await supabase.from('transfers').select('id,kind,amount,to_club,from_club,player:players(id,name)').order('occurred_at', { ascending: false }).limit(4)) as unknown as { id: number; kind: string; amount: number; to_club: number | null; from_club: number | null; player: { id: number; name: string } }[] })
   if (seasons.isError || clubsQ.isError) return <ErrorState onRetry={() => { seasons.refetch(); clubsQ.refetch() }} />
   if (!seasons.data || !clubsQ.data || !archives.data) return <Loading />
@@ -68,7 +68,7 @@ export function Home() {
             {tableRows ? <><StandingsTable rows={tableRows} clubs={clubs} compact /><ZoneLegend count={tableRows.length} /></> : <Loading />}
           </Section>
           <Section title="Últimas noticias" to="/noticias" linkLabel="Todas las noticias">
-            {news.data?.length ? <div className="news-list">{news.data.map((n) => <Link key={n.id} to="/noticias"><b>{n.title ?? n.body.split('\n')[0].slice(0, 90)}</b><small>{fmtDate(n.published_at)}</small></Link>)}</div>
+            {news.data?.length ? <div className="news-list">{news.data.map((n) => <Link key={n.id} to={`/noticias#n${n.id}`}><Crest club={n.club_id ? clubs.get(n.club_id) : null} size={24} /><span><b>{n.title ?? n.body.split('\n')[0].slice(0, 90)}</b><small>{n.club_id ? clubs.get(n.club_id)?.name : 'NG League'}, {fmtDate(n.published_at)}</small></span></Link>)}</div>
               : <Empty title="Todavía no hay noticias publicadas." />}
           </Section>
         </div>
